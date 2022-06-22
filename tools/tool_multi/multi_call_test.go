@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestGroupCall(t *testing.T) {
+func TestMultiCall(t *testing.T) {
 	funcList := make([]func(ctx context.Context) (interface{}, error), 0)
 	for i := 0; i < 5; i++ {
 		funcList = append(funcList, func(ctx context.Context) (interface{}, error) {
