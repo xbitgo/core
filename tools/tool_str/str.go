@@ -21,7 +21,7 @@ func RandString(len int) string {
 
 // UUID .
 func UUID() string {
-	u1 := uuid.Must(uuid.NewV4())
+	u1 := uuid.Must(uuid.NewV6())
 	return u1.String()
 }
 
