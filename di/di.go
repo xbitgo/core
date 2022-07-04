@@ -35,6 +35,14 @@ func Get(name string) interface{} {
 	return gInstance.registry.get(name)
 }
 
+func GetInst(name string) interface{} {
+	item := gInstance.registry.get(name)
+	if item == nil {
+		return nil
+	}
+	return item.value
+}
+
 func Bind(target interface{}) error {
 	return gInstance.registry.Bind(target)
 }
