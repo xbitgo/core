@@ -3,7 +3,6 @@ package tool_http
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xbitgo/core/log"
 	"github.com/xbitgo/core/tools/tool_json"
 )
 
@@ -32,28 +32,28 @@ var (
 )
 
 // PostRaw PostRaw
-func PostRaw(client *http.Client, url string, header http.Header, reqBody interface{}, params ...int) ([]byte, error) {
+func PostRaw(client *http.Client, url string, header http.Header, reqBody interface{}, params ...int) ([]byte, *http.Response, error) {
 	var (
 		data []byte
+		resp *http.Response
 		err  error
 	)
-	timeOut, retryCount := genDefaultParams(params...)
+	timeout, retryCount := genDefaultParams(params...)
 	for i := 0; i < retryCount; i++ {
-		data, err = do(client, http.MethodPost, url, header, reqBody, timeOut)
+		data, resp, err = do(client, http.MethodPost, url, header, reqBody, timeout)
 		if err == nil {
 			break
 		}
 	}
 	if err != nil {
-		fmt.Println(err)
-		//log ...
+		log.Errorf("PostRaw err: %v", err)
 	}
-	return data, err
+	return data, resp, err
 }
 
 // PostWithUnmarshal do http get with unmarshal
 func PostWithUnmarshal(client *http.Client, url string, header http.Header, reqBody interface{}, resp interface{}, params ...int) error {
-	data, err := PostRaw(client, url, header, reqBody, params...)
+	data, _, err := PostRaw(client, url, header, reqBody, params...)
 	if err != nil {
 		return err
 	}
@@ -66,35 +66,34 @@ func PostWithUnmarshal(client *http.Client, url string, header http.Header, reqB
 	decoder.UseNumber()
 	err = decoder.Decode(resp)
 	if err != nil {
-		fmt.Println(err)
-		//log.Error("PostWithUnmarshal.Decode").Stack().Msgf("err:%s, url:%s, respData:%s", err, url, string(data))
+		log.Errorf("PostWithUnmarshal.Decode err: %v", err)
 	}
 	return err
 }
 
 // GetRaw get http raw
-func GetRaw(client *http.Client, url string, header http.Header, reqBody interface{}, params ...int) ([]byte, error) {
+func GetRaw(client *http.Client, url string, header http.Header, reqBody interface{}, params ...int) ([]byte, *http.Response, error) {
 	var (
 		data []byte
+		resp *http.Response
 		err  error
 	)
-	timeOut, retryCount := genDefaultParams(params...)
+	timeout, retryCount := genDefaultParams(params...)
 	for i := 0; i < retryCount; i++ {
-		data, err = do(client, http.MethodGet, url, header, reqBody, timeOut)
+		data, resp, err = do(client, http.MethodGet, url, header, reqBody, timeout)
 		if err == nil {
 			break
 		}
 	}
 	if err != nil {
-		fmt.Println(err)
-		//log.Error("GetRaw").Stack().Msgf("err:%s", err)
+		log.Errorf("GetRaw err: %v", err)
 	}
-	return data, err
+	return data, resp, err
 }
 
 // GetWithUnmarshal do http get with unmarshal
 func GetWithUnmarshal(client *http.Client, url string, header http.Header, reqBody interface{}, resp interface{}, params ...int) error {
-	data, err := GetRaw(client, url, header, reqBody, params...)
+	data, _, err := GetRaw(client, url, header, reqBody, params...)
 	if err != nil {
 		return err
 	}
@@ -102,29 +101,27 @@ func GetWithUnmarshal(client *http.Client, url string, header http.Header, reqBo
 	if resp == nil {
 		return nil
 	}
-	// for big int
 	decoder := tool_json.JSON.NewDecoder(bytes.NewBuffer(data))
 	decoder.UseNumber()
 	err = decoder.Decode(resp)
 	if err != nil {
-		fmt.Println(err)
-		//log.Error("GetWithUnmarshal.Decode").Stack().Msgf("err:%s, url:%s, respData:%s", err, url, string(data))
+		log.Errorf("GetWithUnmarshal.Decode err: %v", err)
 	}
 	return err
 }
 
 func genDefaultParams(params ...int) (int, int) {
-	timeOut, retryCount := defaultTimeout, defaultRetryCount
+	timeout, retryCount := defaultTimeout, defaultRetryCount
 	switch {
 	case len(params) >= 2:
-		timeOut, retryCount = params[0], params[1]
+		timeout, retryCount = params[0], params[1]
 	case len(params) >= 1:
-		timeOut = params[0]
+		timeout = params[0]
 	}
-	return timeOut, retryCount
+	return timeout, retryCount
 }
 
-func do(client *http.Client, method string, url string, header http.Header, reqBody interface{}, timeOut int) ([]byte, error) {
+func do(client *http.Client, method string, url string, header http.Header, reqBody interface{}, timeout int) ([]byte, *http.Response, error) {
 	if client == nil {
 		client = defaultHTTPClient
 	}
@@ -142,29 +139,28 @@ func do(client *http.Client, method string, url string, header http.Header, reqB
 		buff := &bytes.Buffer{}
 		err := tool_json.JSON.NewEncoder(buff).Encode(v)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		reader = buff
 	}
 	req, err := http.NewRequest(method, url, reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if header != nil {
 		req.Header = header
 	}
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeOut))
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(timeout))
 	defer cancelFunc()
 	req = req.WithContext(ctx)
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err // TODO maybe should define ctx timeout in package errs
+		return nil, resp, err
 	}
 	defer resp.Body.Close()
-	// TODO maybe should handle status not equal 200
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, resp, err
 	}
-	return data, nil
+	return data, resp, nil
 }
