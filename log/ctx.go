@@ -7,6 +7,8 @@ import (
 	"strconv"
 )
 
+var TraceIDKey = "traceId"
+
 type logContext struct {
 	log    *Logger
 	Level  zerolog.Level
@@ -39,7 +41,7 @@ func (l *logContext) Stack(depth int) *logContext {
 
 func (l *logContext) TraceID(ctx context.Context) *logContext {
 	if l.log.traceIdFunc != nil {
-		l.fields["traceId"] = l.log.traceIdFunc(ctx)
+		l.fields[TraceIDKey] = l.log.traceIdFunc(ctx)
 	}
 	return l
 }
