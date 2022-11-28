@@ -34,7 +34,9 @@ func (l *Logger) msg(level zerolog.Level, fields map[string]interface{}, msg ...
 }
 
 func (l *Logger) msgf(level zerolog.Level, fields map[string]interface{}, format string, v ...interface{}) {
-	fields["_ts"] = fmt.Sprintf("%d.%d", time.Now().Unix(), time.Now().Nanosecond()/1000)
+	ts := time.Now()
+	fields["_ts"] = fmt.Sprintf("%d.%d", ts.Unix(), ts.Nanosecond()/1000)
+	fields["_time"] = ts.Format("2006-01-02 15:04:05")
 	if len(v) == 0 {
 		l.zLogger.WithLevel(level).Fields(fields).Msg(format)
 		return
